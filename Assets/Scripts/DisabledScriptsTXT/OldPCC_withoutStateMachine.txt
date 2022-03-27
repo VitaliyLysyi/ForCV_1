@@ -1,0 +1,149 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class PlayerCharacterController : MonoBehaviour
+{
+    public float MaxSpeed = 10f;
+    public float MaxOnAirSpeed = 7f;
+    public float MaxCrouchSpeed = 5f;
+    public float ClimbSpeed = 5f;
+    public float JumpForce = 17f;
+    public float DefaultGravity = 3f;
+    public bool AirControll = true;
+    public Transform GroundCheckPoint;
+    public LayerMask GroundLayer;
+
+    private Animator Anim;
+    private Rigidbody2D Body;
+    private CircleCollider2D FootCircle;
+    private BoxCollider2D HitBox;
+
+    private static float GroundRadius = 0.2f;
+
+    private bool FacingRight = true;
+    private bool Grounded;
+    private bool JumpOff;
+    private float AxisX;
+    private float AxisY;
+    private bool Jump;
+    private bool Climb;
+    private bool Crouch;
+
+    void Start()
+    {
+        Anim = GetComponent<Animator>();
+        Body = GetComponent<Rigidbody2D>();
+        FootCircle = GetComponent<CircleCollider2D>();
+        HitBox = GetComponent<BoxCollider2D>();
+
+        Body.gravityScale = DefaultGravity;
+
+        if (GroundCheckPoint == null)
+            Debug.Log("ѕерет€гни доч≥рню Point обЇкта √√ в параметри скр≥пта бо не бачить землю!");
+    }
+
+    void FixedUpdate()
+    {
+        Grounded = Physics2D.OverlapCircle(GroundCheckPoint.position, GroundRadius, GroundLayer);
+
+        if (Grounded && !Crouch)
+            Body.velocity = new Vector2(AxisX * MaxSpeed, Body.velocity.y);
+        else if (Grounded && Crouch)
+            Body.velocity = new Vector2(AxisX * MaxCrouchSpeed, Body.velocity.y);
+        else if (AirControll)
+            Body.velocity = new Vector2(AxisX * MaxOnAirSpeed, Body.velocity.y);
+
+        if (AxisX > 0 && !FacingRight)
+            Flip();
+        else if (AxisX < 0 && FacingRight)
+            Flip();
+
+        if (!JumpOff)
+            FootCircle.enabled = true;
+        else if (AxisY < 0)
+            FootCircle.enabled = false;
+
+        if (!Grounded)
+            JumpOff = false;
+
+        if (AxisY > 0 && Grounded && !Jump)
+        {
+            Body.velocity = new Vector2(Body.velocity.x, JumpForce);
+            Jump = true;
+        }  
+
+        if (Mathf.Abs(Body.velocity.y) < 1  && Grounded)
+            Jump = false;
+
+        if (Climb)
+        {
+            Grounded = false;
+            Jump = false;
+            if (Crouch)
+                Climb = false;
+            Body.gravityScale = 0;
+            Body.velocity = new Vector2(AxisX * ClimbSpeed, AxisY * ClimbSpeed);
+        }
+        else
+            Body.gravityScale = DefaultGravity;
+
+        AnimationUpdate();
+
+        /*Debug.Log(
+            "Position: " + Body.position + "   " +
+            "Velocity: " + Body.velocity + "   " +
+            "Grounded: " + Grounded + "   " +
+            "Jump: " + Jump + "   " +
+            "Climb: " + Climb + "   " +
+            "Crouch: " + Crouch + "   " +
+            "JumpOff: " + JumpOff);*/
+    }
+
+    private void Update()
+    {
+        AxisX = Input.GetAxis("Horizontal");
+        AxisY = Input.GetAxis("Vertical");
+        Crouch = Input.GetKey(KeyCode.LeftShift);
+    }
+
+    private void OnTriggerStay2D(Collider2D collision)
+    {
+        if (collision.gameObject.tag == "Ladder" && AxisY != 0 && !Crouch)
+            Climb = true;
+    }
+
+    private void OnTriggerExit2D(Collider2D collision)
+    {
+        if (collision.gameObject.tag == "Ladder")
+            Climb = false;
+
+        if (collision.gameObject.tag == "Platform")
+            JumpOff = false;
+    }
+
+    private void OnCollisionEnter2D(Collision2D collision)
+    {
+        if (collision.gameObject.tag == "Platform")
+            JumpOff = true;
+        else
+            JumpOff = false;
+    }
+
+    void AnimationUpdate()
+    {
+        Anim.SetBool("Grounded", Grounded);
+        Anim.SetBool("Crouch", Crouch);
+        Anim.SetBool("Climb", Climb);
+        Anim.SetFloat("VSpeed", Body.velocity.y);
+        Anim.SetFloat("Speed", Mathf.Abs(Body.velocity.x));
+    }
+
+    void Flip()
+    {
+        FacingRight = !FacingRight;
+        Vector3 LocalScale = transform.localScale;
+        LocalScale.x *= -1;
+        transform.localScale = LocalScale;
+    }
+}
